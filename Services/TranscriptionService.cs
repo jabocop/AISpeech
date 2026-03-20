@@ -53,7 +53,11 @@ public sealed class TranscriptionService : IDisposable
 
         var useGpu = !_runtime.Equals("Cpu", StringComparison.OrdinalIgnoreCase);
         _factory = WhisperFactory.FromPath(fullPath, new WhisperFactoryOptions { UseGpu = useGpu });
+
+        LoadedRuntime = RuntimeOptions.LoadedLibrary.ToString();
     }
+
+    public string? LoadedRuntime { get; private set; }
 
     public async Task<string> TranscribeAsync(MemoryStream wavStream)
     {

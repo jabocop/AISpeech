@@ -27,4 +27,6 @@ public sealed class AppSettings
     public string AzureOpenAIApiKey { get; set; } = "";
     public string AzureOpenAIDeployment { get; set; } = "";
     public string AzureOpenAIApiVersion { get; set; } = "2024-02-15-preview";
+
+    public bool AutoPasteAtCursor { get; set; } = false;
 }

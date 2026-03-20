@@ -22,6 +22,9 @@ public sealed class TrayApplicationContext : ApplicationContext
     private string? _lastTranscription;
     private string? _lastRawText;
     private ToolStripMenuItem? _reprocessMenu;
+    private ToolStripMenuItem? _autoPasteMenu;
+    private bool _autoPasteToCursor;
+    private IntPtr _targetWindow;
 
     private static readonly TimeSpan MinRecordingDuration = TimeSpan.FromMilliseconds(500);
 
@@ -50,6 +53,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _textCleanup = new TextCleanupService(settings);
         _phraseTrigger = new PhraseTriggerService(settings);
         _clipboard = new ClipboardService(_marshalForm);
+        _autoPasteToCursor = settings.AutoPasteAtCursor;
         _hotkeyManager = new HotkeyManagerService(settings);
 
         _hotkeyManager.RecordingStarted += OnRecordingStarted;
@@ -60,6 +64,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             Log($"Speech trigger: \"{trigger.Phrase}\" → {trigger.Mode}");
         Log($"Whisper model: {settings.WhisperModelPath} ({settings.WhisperModelType}), runtime: {settings.WhisperRuntime}, language: {settings.Language}");
         Log($"Azure OpenAI cleanup: {(_textCleanup.IsConfigured ? "enabled" : "disabled (no config)")}");
+        Log($"Auto-paste at cursor: {(settings.AutoPasteAtCursor ? "enabled" : "disabled")}");
 
         _ = InitializeAsync();
     }
@@ -70,6 +75,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             Log("Initializing Whisper model...");
             await _transcriber.InitializeAsync();
+            Log($"Whisper runtime: {_transcriber.LoadedRuntime}");
             Log("Whisper model ready.");
 
             Log("Starting global hotkey hook...");
@@ -122,6 +128,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
 
         _recordingStopwatch.Stop();
+        _targetWindow = _autoPasteToCursor ? ClipboardService.CaptureTargetWindow() : IntPtr.Zero;
         Log($"Recording stopped. Duration: {_recordingStopwatch.Elapsed.TotalSeconds:F2}s");
         _ = ProcessRecordingAsync();
     }
@@ -168,8 +175,8 @@ public sealed class TrayApplicationContext : ApplicationContext
 
             _lastTranscription = text;
             UpdateReprocessMenu();
-            await _clipboard.SetTextAsync(text);
-            Log("Text copied to clipboard.");
+            await _clipboard.SetTextAsync(text, _autoPasteToCursor, _targetWindow);
+            Log(_autoPasteToCursor ? "Text pasted at cursor." : "Text copied to clipboard.");
         }
         catch (Exception ex)
         {
@@ -192,6 +199,20 @@ public sealed class TrayApplicationContext : ApplicationContext
         foreach (var mode in Enum.GetValues<CaptureMode>())
             _reprocessMenu.DropDownItems.Add(mode.ToString(), null, (_, _) => _ = ReprocessAsync(mode));
         menu.Items.Add(_reprocessMenu);
+
+        menu.Items.Add(new ToolStripSeparator());
+
+        _autoPasteMenu = new ToolStripMenuItem("Auto paste to cursor")
+        {
+            CheckOnClick = true,
+            Checked = _autoPasteToCursor
+        };
+        _autoPasteMenu.CheckedChanged += (_, _) =>
+        {
+            _autoPasteToCursor = _autoPasteMenu.Checked;
+            Log($"Auto-paste at cursor: {(_autoPasteToCursor ? "enabled" : "disabled")}");
+        };
+        menu.Items.Add(_autoPasteMenu);
 
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Show Debug Log", null, (_, _) => _debugForm.Show());
