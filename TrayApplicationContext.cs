@@ -58,7 +58,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         Log($"Hotkey: {settings.HotkeyModifiers}+{settings.HotkeyKey}".TrimEnd('+'));
         foreach (var trigger in _phraseTrigger.Triggers)
             Log($"Speech trigger: \"{trigger.Phrase}\" → {trigger.Mode}");
-        Log($"Whisper model: {settings.WhisperModelPath} ({settings.WhisperModelType}), language: {settings.Language}");
+        Log($"Whisper model: {settings.WhisperModelPath} ({settings.WhisperModelType}), runtime: {settings.WhisperRuntime}, language: {settings.Language}");
         Log($"Azure OpenAI cleanup: {(_textCleanup.IsConfigured ? "enabled" : "disabled (no config)")}");
 
         _ = InitializeAsync();

@@ -1,5 +1,6 @@
 using Whisper.net;
 using Whisper.net.Ggml;
+using Whisper.net.LibraryLoader;
 
 namespace AISpeech.Services;
 
@@ -9,6 +10,7 @@ public sealed class TranscriptionService : IDisposable
     private readonly string _modelPath;
     private readonly GgmlType _modelType;
     private readonly string _language;
+    private readonly string _runtime;
     private bool _disposed;
 
     public TranscriptionService(AppSettings settings)
@@ -16,6 +18,19 @@ public sealed class TranscriptionService : IDisposable
         _modelPath = settings.WhisperModelPath;
         _modelType = Enum.Parse<GgmlType>(settings.WhisperModelType, ignoreCase: true);
         _language = settings.Language;
+        _runtime = settings.WhisperRuntime;
+
+        ConfigureRuntime(_runtime);
+    }
+
+    private static void ConfigureRuntime(string runtime)
+    {
+        RuntimeOptions.RuntimeLibraryOrder = runtime.ToLowerInvariant() switch
+        {
+            "cuda" => [RuntimeLibrary.Cuda],
+            "vulkan" => [RuntimeLibrary.Vulkan],
+            _ => [RuntimeLibrary.Cpu],
+        };
     }
 
     public async Task InitializeAsync()
@@ -35,7 +50,8 @@ public sealed class TranscriptionService : IDisposable
             await modelStream.CopyToAsync(fileStream);
         }
 
-        _factory = WhisperFactory.FromPath(fullPath);
+        var useGpu = !_runtime.Equals("Cpu", StringComparison.OrdinalIgnoreCase);
+        _factory = WhisperFactory.FromPath(fullPath, new WhisperFactoryOptions { UseGpu = useGpu });
     }
 
     public async Task<string> TranscribeAsync(MemoryStream wavStream)

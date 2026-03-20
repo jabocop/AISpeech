@@ -19,6 +19,7 @@ public sealed class AppSettings
 
     public string WhisperModelPath { get; set; } = "models/ggml-base.bin";
     public string WhisperModelType { get; set; } = "Base";
+    public string WhisperRuntime { get; set; } = "Cpu";
     public string Language { get; set; } = "en";
 
     // Azure OpenAI — configure in appsettings.local.json (gitignored)
