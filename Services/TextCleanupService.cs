@@ -117,7 +117,7 @@ public sealed class TextCleanupService : IDisposable
         No preamble, no commentary, no meta-text.
         """;
 
-    public TextCleanupService(AppSettings settings)
+    public TextCleanupService(AppSettings settings, HttpMessageHandler? httpHandler = null)
     {
         _endpoint = settings.AzureOpenAIEndpoint.TrimEnd('/');
         _deployment = settings.AzureOpenAIDeployment;
@@ -127,7 +127,7 @@ public sealed class TextCleanupService : IDisposable
             && !string.IsNullOrWhiteSpace(settings.AzureOpenAIApiKey)
             && !string.IsNullOrWhiteSpace(_deployment);
 
-        _httpClient = new HttpClient();
+        _httpClient = httpHandler is not null ? new HttpClient(httpHandler) : new HttpClient();
         if (IsConfigured)
         {
             _httpClient.DefaultRequestHeaders.Add("api-key", settings.AzureOpenAIApiKey);
