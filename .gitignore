@@ -1,0 +1,5 @@
+bin/
+obj/
+models/
+appsettings.local.json
+.claude/settings.local.json
