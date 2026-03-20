@@ -8,7 +8,8 @@ A Windows system tray application that captures speech via a global hotkey, tran
 2. Release the hotkey — audio is transcribed locally via Whisper
 3. A **speech trigger phrase** at any point in your speech selects the processing mode
 4. If Azure OpenAI is configured, the transcription is refined based on the detected mode
-5. The final text is copied to your clipboard
+5. Audio cues play at each stage (configurable)
+6. The final text is copied to your clipboard
 
 ## Speech trigger modes
 
@@ -89,6 +90,9 @@ All settings live in `appsettings.json` (defaults) and `appsettings.local.json` 
 | `WhisperModelPath` | `models/ggml-base.bin` | Path to the Whisper GGML model file |
 | `WhisperModelType` | `Base` | Model size: `Tiny`, `Base`, `Small`, `Medium`, `Large` |
 | `WhisperRuntime` | `Cuda` | Inference runtime: `Cuda` (NVIDIA), `Vulkan` (AMD/Intel/NVIDIA), `Cpu`. Falls back automatically (Cuda → Vulkan → Cpu) |
+| `SoundOnRecordStart` | `true` | Play a two-tone cue when recording starts |
+| `SoundOnRecordStop` | `true` | Play a two-tone cue when recording stops |
+| `SoundOnTranscriptionComplete` | `true` | Play a triple-pip cue when the result is ready |
 | `Language` | `en` | Transcription language |
 
 The Whisper model is downloaded automatically on first run if not present.
@@ -141,6 +145,8 @@ Tests cover:
 - **PhraseTriggerService** — Trigger matching, phrase removal, case insensitivity, mode detection, edge cases
 - **HotkeyManagerService** — Modifier parsing, validation, case insensitivity, error handling
 - **TextCleanupService** — Request formatting, API key headers, mode-specific system prompts, error handling, response parsing (all HTTP calls are mocked — no real requests to Azure OpenAI)
+- **AppSettings** — Sound settings defaults and configuration binding
+- **SoundService** — Disabled-sound no-ops, disposal safety
 
 ## CI
 
@@ -168,12 +174,14 @@ AISpeech/
 │   ├── PhraseTriggerService.cs   Speech trigger phrase detection
 │   ├── TextCleanupService.cs     Azure OpenAI text refinement
 │   ├── ClipboardService.cs       Thread-safe clipboard access
-│   └── NotificationService.cs    Windows toast notifications
+│   ├── NotificationService.cs    Windows toast notifications
+│   └── SoundService.cs           Audio feedback cues (NAudio)
 ├── AISpeech.Tests/
 │   └── Services/
 │       ├── PhraseTriggerServiceTests.cs
 │       ├── HotkeyManagerServiceTests.cs
-│       └── TextCleanupServiceTests.cs
+│       ├── TextCleanupServiceTests.cs
+│       └── SoundServiceTests.cs
 └── .github/workflows/ci.yml     CI pipeline
 ```
 

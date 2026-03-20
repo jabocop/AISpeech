@@ -29,4 +29,8 @@ public sealed class AppSettings
     public string AzureOpenAIApiVersion { get; set; } = "2024-02-15-preview";
 
     public bool AutoPasteAtCursor { get; set; } = false;
+
+    public bool SoundOnRecordStart { get; set; } = true;
+    public bool SoundOnRecordStop { get; set; } = true;
+    public bool SoundOnTranscriptionComplete { get; set; } = true;
 }

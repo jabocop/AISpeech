@@ -15,6 +15,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private readonly TextCleanupService _textCleanup;
     private readonly PhraseTriggerService _phraseTrigger;
     private readonly TrayIconManager _iconManager;
+    private readonly SoundService _sound;
     private readonly Form _marshalForm;
     private readonly Stopwatch _recordingStopwatch = new();
 
@@ -53,6 +54,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _textCleanup = new TextCleanupService(settings);
         _phraseTrigger = new PhraseTriggerService(settings);
         _clipboard = new ClipboardService(_marshalForm);
+        _sound = new SoundService(settings);
         _autoPasteToCursor = settings.AutoPasteAtCursor;
         _hotkeyManager = new HotkeyManagerService(settings);
 
@@ -65,6 +67,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         Log($"Whisper model: {settings.WhisperModelPath} ({settings.WhisperModelType}), runtime: {settings.WhisperRuntime}, language: {settings.Language}");
         Log($"Azure OpenAI cleanup: {(_textCleanup.IsConfigured ? "enabled" : "disabled (no config)")}");
         Log($"Auto-paste at cursor: {(settings.AutoPasteAtCursor ? "enabled" : "disabled")}");
+        Log($"Sound effects: start={settings.SoundOnRecordStart}, stop={settings.SoundOnRecordStop}, done={settings.SoundOnTranscriptionComplete}");
 
         _ = InitializeAsync();
     }
@@ -106,6 +109,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             _recorder.StartRecording();
             _recordingStopwatch.Restart();
+            _sound.PlayRecordStart();
             SetTrayState(RecordingState.Recording);
             Log("Recording started.");
         }
@@ -128,6 +132,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
 
         _recordingStopwatch.Stop();
+        _sound.PlayRecordStop();
         _targetWindow = _autoPasteToCursor ? ClipboardService.CaptureTargetWindow() : IntPtr.Zero;
         Log($"Recording stopped. Duration: {_recordingStopwatch.Elapsed.TotalSeconds:F2}s");
         _ = ProcessRecordingAsync();
@@ -176,6 +181,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             _lastTranscription = text;
             UpdateReprocessMenu();
             await _clipboard.SetTextAsync(text, _autoPasteToCursor, _targetWindow);
+            _sound.PlayTranscriptionComplete();
             Log(_autoPasteToCursor ? "Text pasted at cursor." : "Text copied to clipboard.");
         }
         catch (Exception ex)
@@ -276,6 +282,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _transcriber.Dispose();
         _textCleanup.Dispose();
         _hotkeyManager.Dispose();
+        _sound.Dispose();
         _debugForm.Close();
         Application.Exit();
     }
@@ -291,6 +298,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             _transcriber.Dispose();
             _textCleanup.Dispose();
             _hotkeyManager.Dispose();
+            _sound.Dispose();
             _debugForm.Dispose();
         }
         base.Dispose(disposing);
