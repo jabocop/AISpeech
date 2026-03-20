@@ -69,4 +69,52 @@ public class AppSettingsTests
 
         settings.AutoPasteAtCursor.Should().BeFalse();
     }
+
+    [Fact]
+    public void SoundSettings_DefaultToTrue()
+    {
+        var settings = new AppSettings();
+
+        settings.SoundOnRecordStart.Should().BeTrue();
+        settings.SoundOnRecordStop.Should().BeTrue();
+        settings.SoundOnTranscriptionComplete.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SoundSettings_BindFromConfiguration()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AISpeech:SoundOnRecordStart"] = "false",
+                ["AISpeech:SoundOnRecordStop"] = "false",
+                ["AISpeech:SoundOnTranscriptionComplete"] = "false"
+            })
+            .Build();
+
+        var settings = new AppSettings();
+        config.GetSection("AISpeech").Bind(settings);
+
+        settings.SoundOnRecordStart.Should().BeFalse();
+        settings.SoundOnRecordStop.Should().BeFalse();
+        settings.SoundOnTranscriptionComplete.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SoundSettings_KeepDefaults_WhenNotInConfiguration()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AISpeech:Language"] = "sv"
+            })
+            .Build();
+
+        var settings = new AppSettings();
+        config.GetSection("AISpeech").Bind(settings);
+
+        settings.SoundOnRecordStart.Should().BeTrue();
+        settings.SoundOnRecordStop.Should().BeTrue();
+        settings.SoundOnTranscriptionComplete.Should().BeTrue();
+    }
 }
