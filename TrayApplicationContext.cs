@@ -6,7 +6,7 @@ namespace AISpeech;
 public sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly AppSettings _settings;
-    private readonly DebugForm? _debugForm;
+    private readonly DebugForm _debugForm;
     private readonly NotifyIcon _trayIcon;
     private readonly AudioRecorderService _recorder;
     private readonly TranscriptionService _transcriber;
@@ -25,7 +25,7 @@ public sealed class TrayApplicationContext : ApplicationContext
 
     private static readonly TimeSpan MinRecordingDuration = TimeSpan.FromMilliseconds(500);
 
-    public TrayApplicationContext(AppSettings settings, DebugForm? debugForm = null)
+    public TrayApplicationContext(AppSettings settings, DebugForm debugForm)
     {
         _settings = settings;
         _debugForm = debugForm;
@@ -194,8 +194,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(_reprocessMenu);
 
         menu.Items.Add(new ToolStripSeparator());
-        if (_debugForm is not null)
-            menu.Items.Add("Show Debug Log", null, (_, _) => _debugForm.Show());
+        menu.Items.Add("Show Debug Log", null, (_, _) => _debugForm.Show());
         menu.Items.Add("Exit", null, (_, _) => ExitApplication());
         return menu;
     }
@@ -256,7 +255,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _transcriber.Dispose();
         _textCleanup.Dispose();
         _hotkeyManager.Dispose();
-        _debugForm?.Close();
+        _debugForm.Close();
         Application.Exit();
     }
 
@@ -271,7 +270,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             _transcriber.Dispose();
             _textCleanup.Dispose();
             _hotkeyManager.Dispose();
-            _debugForm?.Dispose();
+            _debugForm.Dispose();
         }
         base.Dispose(disposing);
     }
@@ -300,8 +299,8 @@ public sealed class TrayApplicationContext : ApplicationContext
     }
 
     private void Log(string message, DebugForm.LogLevel level = DebugForm.LogLevel.Info)
-        => _debugForm?.Log(message, level);
+        => _debugForm.Log(message, level);
 
     private void LogError(string message)
-        => _debugForm?.Log(message, DebugForm.LogLevel.Error);
+        => _debugForm.Log(message, DebugForm.LogLevel.Error);
 }

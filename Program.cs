@@ -20,9 +20,7 @@ internal static class Program
         var settings = new AppSettings();
         configuration.GetSection("AISpeech").Bind(settings);
 
-        var debugMode = args.Contains("--debug", StringComparer.OrdinalIgnoreCase);
-        DebugForm? debugForm = debugMode ? new DebugForm() : null;
-        debugForm?.Show();
+        var debugForm = new DebugForm();
 
         using var appContext = new TrayApplicationContext(settings, debugForm);
         Application.Run(appContext);

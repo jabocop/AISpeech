@@ -67,8 +67,6 @@ Without Azure OpenAI configured, the app still works — it just returns the raw
 
 ```bash
 dotnet run
-# or with debug log window:
-dotnet run -- --debug
 ```
 
 The app runs in the system tray. Right-click the tray icon for options.
@@ -117,7 +115,7 @@ AISpeech/
 ├── RecordingState.cs             Enum: Idle, Recording, Processing
 ├── TrayApplicationContext.cs     Main app lifecycle, coordinates services
 ├── TrayIconManager.cs            Dynamic tray icon generation
-├── DebugForm.cs                  Optional debug log window
+├── DebugForm.cs                  Debug log window
 ├── appsettings.json              Default configuration
 ├── appsettings.local.json        Local secrets (git-ignored)
 └── Services/
