@@ -88,14 +88,14 @@ All settings live in `appsettings.json` (defaults) and `appsettings.local.json` 
 | `SpeechTriggers` | see below | List of `{ Phrase, Mode }` trigger definitions |
 | `WhisperModelPath` | `models/ggml-base.bin` | Path to the Whisper GGML model file |
 | `WhisperModelType` | `Base` | Model size: `Tiny`, `Base`, `Small`, `Medium`, `Large` |
-| `WhisperRuntime` | `Cpu` | Inference runtime: `Cpu`, `Vulkan` (AMD/Intel/NVIDIA), `Cuda` (NVIDIA only) |
+| `WhisperRuntime` | `Cuda` | Inference runtime: `Cuda` (NVIDIA), `Vulkan` (AMD/Intel/NVIDIA), `Cpu`. Falls back automatically (Cuda → Vulkan → Cpu) |
 | `Language` | `en` | Transcription language |
 
 The Whisper model is downloaded automatically on first run if not present.
 
 ### GPU-accelerated transcription
 
-By default, Whisper runs on the CPU. To use your GPU for faster transcription, set `WhisperRuntime` in `appsettings.local.json`:
+By default, Whisper tries CUDA first, then Vulkan, then CPU — so GPU acceleration works out of the box if drivers are available. To force a specific runtime, set `WhisperRuntime` in `appsettings.local.json`:
 
 ```json
 {
@@ -105,11 +105,11 @@ By default, Whisper runs on the CPU. To use your GPU for faster transcription, s
 }
 ```
 
-| Runtime | GPU support |
-|---|---|
-| `Cpu` | None (default) |
-| `Vulkan` | AMD, Intel, and NVIDIA |
-| `Cuda` | NVIDIA only (requires CUDA drivers) |
+| Runtime | GPU support | Fallback chain |
+|---|---|---|
+| `Cuda` | NVIDIA (requires CUDA drivers) | Cuda → Vulkan → Cpu |
+| `Vulkan` | AMD, Intel, and NVIDIA | Vulkan → Cpu |
+| `Cpu` | None | Cpu only |
 
 ### Adding custom speech triggers
 

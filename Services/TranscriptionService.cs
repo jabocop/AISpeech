@@ -27,9 +27,10 @@ public sealed class TranscriptionService : IDisposable
     {
         RuntimeOptions.RuntimeLibraryOrder = runtime.ToLowerInvariant() switch
         {
-            "cuda" => [RuntimeLibrary.Cuda],
-            "vulkan" => [RuntimeLibrary.Vulkan],
-            _ => [RuntimeLibrary.Cpu],
+            "cuda" => [RuntimeLibrary.Cuda, RuntimeLibrary.Vulkan, RuntimeLibrary.Cpu],
+            "vulkan" => [RuntimeLibrary.Vulkan, RuntimeLibrary.Cpu],
+            "cpu" => [RuntimeLibrary.Cpu],
+            _ => [RuntimeLibrary.Cuda, RuntimeLibrary.Vulkan, RuntimeLibrary.Cpu],
         };
     }
 
