@@ -124,6 +124,30 @@ Add entries to the `SpeechTriggers` array in `appsettings.json`:
 
 Phrases are matched case-insensitively anywhere in the transcription. The first match wins.
 
+## Testing
+
+The project includes unit tests using xUnit and FluentAssertions.
+
+```bash
+# Run all tests
+dotnet test
+
+# Run tests with detailed output
+dotnet test --logger "console;verbosity=detailed"
+```
+
+Tests cover:
+
+- **PhraseTriggerService** — Trigger matching, phrase removal, case insensitivity, mode detection, edge cases
+- **HotkeyManagerService** — Modifier parsing, validation, case insensitivity, error handling
+- **TextCleanupService** — Request formatting, API key headers, mode-specific system prompts, error handling, response parsing (all HTTP calls are mocked — no real requests to Azure OpenAI)
+
+## CI
+
+A GitHub Actions workflow runs on every push and on pull requests to `master`. It builds the solution and runs all tests on `windows-latest`.
+
+The workflow is defined in `.github/workflows/ci.yml`.
+
 ## Project structure
 
 ```
@@ -137,14 +161,20 @@ AISpeech/
 ├── DebugForm.cs                  Debug log window
 ├── appsettings.json              Default configuration
 ├── appsettings.local.json        Local secrets (git-ignored)
-└── Services/
-    ├── AudioRecorderService.cs   Microphone capture (NAudio, 16kHz mono)
-    ├── TranscriptionService.cs   Local Whisper transcription
-    ├── HotkeyManagerService.cs   Global hotkey detection (SharpHook)
-    ├── PhraseTriggerService.cs   Speech trigger phrase detection
-    ├── TextCleanupService.cs     Azure OpenAI text refinement
-    ├── ClipboardService.cs       Thread-safe clipboard access
-    └── NotificationService.cs    Windows toast notifications
+├── Services/
+│   ├── AudioRecorderService.cs   Microphone capture (NAudio, 16kHz mono)
+│   ├── TranscriptionService.cs   Local Whisper transcription
+│   ├── HotkeyManagerService.cs   Global hotkey detection (SharpHook)
+│   ├── PhraseTriggerService.cs   Speech trigger phrase detection
+│   ├── TextCleanupService.cs     Azure OpenAI text refinement
+│   ├── ClipboardService.cs       Thread-safe clipboard access
+│   └── NotificationService.cs    Windows toast notifications
+├── AISpeech.Tests/
+│   └── Services/
+│       ├── PhraseTriggerServiceTests.cs
+│       ├── HotkeyManagerServiceTests.cs
+│       └── TextCleanupServiceTests.cs
+└── .github/workflows/ci.yml     CI pipeline
 ```
 
 ## Dependencies
