@@ -47,14 +47,36 @@ public class ClipboardServiceTests
         task.GetAwaiter().GetResult(); // rethrow if faulted
     }
 
-    private static (ClipboardService Service, Form MarshalForm) CreateService()
+    private static (ClipboardService Service, Form MarshalForm) CreateService(
+        ISystemInputSimulator? inputSimulator = null)
     {
         var form = new Form { ShowInTaskbar = false, WindowState = FormWindowState.Minimized };
         form.Show();
         form.Hide();
         // Prime the message pump so WindowsFormsSynchronizationContext is established
         Application.DoEvents();
-        return (new ClipboardService(form), form);
+        return (new ClipboardService(form, inputSimulator), form);
+    }
+
+    /// <summary>
+    /// Test stub that records calls without touching real OS APIs.
+    /// </summary>
+    private sealed class FakeInputSimulator : ISystemInputSimulator
+    {
+        public IntPtr LastForegroundWindow { get; private set; }
+        public int ForceForegroundWindowCallCount { get; private set; }
+        public int SimulateCtrlVCallCount { get; private set; }
+
+        public void ForceForegroundWindow(IntPtr hWnd)
+        {
+            LastForegroundWindow = hWnd;
+            ForceForegroundWindowCallCount++;
+        }
+
+        public void SimulateCtrlV()
+        {
+            SimulateCtrlVCallCount++;
+        }
     }
 
     // --- CaptureTargetWindow ---
@@ -172,16 +194,65 @@ public class ClipboardServiceTests
     {
         RunOnStaThread(() =>
         {
-            var (service, form) = CreateService();
+            var fake = new FakeInputSimulator();
+            var (service, form) = CreateService(fake);
             try
             {
-                // Use our own form handle as the target — the paste (Ctrl+V) won't
-                // visibly do anything on a hidden form, but verifies the full code
-                // path (ForceForegroundWindow + SimulateCtrlV) completes without error.
                 var task = service.SetTextAsync("pasted text", autoPaste: true, targetWindow: form.Handle);
                 PumpUntilComplete(task, TimeSpan.FromSeconds(5));
 
                 Clipboard.GetText().Should().Be("pasted text");
+                fake.ForceForegroundWindowCallCount.Should().Be(1);
+                fake.LastForegroundWindow.Should().Be(form.Handle);
+                fake.SimulateCtrlVCallCount.Should().Be(1);
+            }
+            finally
+            {
+                form.Dispose();
+            }
+        });
+    }
+
+    // --- Verify auto-paste is NOT invoked when autoPaste=false ---
+
+    [Fact]
+    public void SetTextAsync_AutoPasteFalse_DoesNotCallInputSimulator()
+    {
+        RunOnStaThread(() =>
+        {
+            var fake = new FakeInputSimulator();
+            var (service, form) = CreateService(fake);
+            try
+            {
+                var task = service.SetTextAsync("no paste", autoPaste: false, targetWindow: form.Handle);
+                PumpUntilComplete(task, TimeSpan.FromSeconds(5));
+
+                fake.ForceForegroundWindowCallCount.Should().Be(0);
+                fake.SimulateCtrlVCallCount.Should().Be(0);
+            }
+            finally
+            {
+                form.Dispose();
+            }
+        });
+    }
+
+    // --- Verify auto-paste is NOT invoked when window is zero ---
+
+    [Fact]
+    public void SetTextAsync_AutoPasteTrue_ZeroWindow_DoesNotCallInputSimulator()
+    {
+        RunOnStaThread(() =>
+        {
+            var fake = new FakeInputSimulator();
+            var (service, form) = CreateService(fake);
+            try
+            {
+                var task = service.SetTextAsync("no paste", autoPaste: true, targetWindow: IntPtr.Zero);
+                PumpUntilComplete(task, TimeSpan.FromSeconds(5));
+
+                fake.ForceForegroundWindowCallCount.Should().Be(0);
+                fake.SimulateCtrlVCallCount.Should().Be(0);
             }
             finally
             {
