@@ -7,10 +7,65 @@ namespace AISpeech.Tests.Services;
 
 public class AudioRecorderServiceSnapshotTests
 {
+    /// <summary>
+    /// A fake IWaveIn that generates synthetic PCM data on a background thread,
+    /// so tests don't require real audio hardware.
+    /// </summary>
+    private sealed class FakeWaveIn : IWaveIn
+    {
+        private readonly WaveFormat _waveFormat = new(16000, 16, 1);
+        private CancellationTokenSource? _cts;
+        private Thread? _thread;
+
+        public WaveFormat WaveFormat
+        {
+            get => _waveFormat;
+            set { }
+        }
+
+        public event EventHandler<WaveInEventArgs>? DataAvailable;
+        public event EventHandler<StoppedEventArgs>? RecordingStopped;
+
+        public void StartRecording()
+        {
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+            _thread = new Thread(() =>
+            {
+                // Generate ~50ms chunks of silence (1600 bytes at 16kHz/16bit/mono)
+                var buffer = new byte[1600];
+                while (!token.IsCancellationRequested)
+                {
+                    DataAvailable?.Invoke(this, new WaveInEventArgs(buffer, buffer.Length));
+                    Thread.Sleep(50);
+                }
+                RecordingStopped?.Invoke(this, new StoppedEventArgs());
+            })
+            { IsBackground = true };
+            _thread.Start();
+        }
+
+        public void StopRecording()
+        {
+            _cts?.Cancel();
+            _thread?.Join(timeout: TimeSpan.FromSeconds(2));
+        }
+
+        public void Dispose()
+        {
+            _cts?.Cancel();
+            _thread?.Join(timeout: TimeSpan.FromSeconds(2));
+            _cts?.Dispose();
+        }
+    }
+
+    private static AudioRecorderService CreateService() =>
+        new(() => new FakeWaveIn());
+
     [Fact]
     public void SnapshotBuffer_WhenNotRecording_ReturnsNull()
     {
-        using var service = new AudioRecorderService();
+        using var service = CreateService();
 
         var snapshot = service.SnapshotBuffer();
 
@@ -20,7 +75,7 @@ public class AudioRecorderServiceSnapshotTests
     [Fact]
     public void SnapshotBuffer_WhileRecording_ReturnsValidWavStream()
     {
-        using var service = new AudioRecorderService();
+        using var service = CreateService();
         service.StartRecording();
 
         // Wait for some audio data to accumulate
@@ -45,7 +100,7 @@ public class AudioRecorderServiceSnapshotTests
     [Fact]
     public void SnapshotBuffer_ProducesValidWavHeader()
     {
-        using var service = new AudioRecorderService();
+        using var service = CreateService();
         service.StartRecording();
 
         Thread.Sleep(300);
@@ -77,7 +132,7 @@ public class AudioRecorderServiceSnapshotTests
     [Fact]
     public void SnapshotBuffer_AfterStopRecording_ReturnsNull()
     {
-        using var service = new AudioRecorderService();
+        using var service = CreateService();
         service.StartRecording();
 
         Thread.Sleep(200);
@@ -91,7 +146,7 @@ public class AudioRecorderServiceSnapshotTests
     [Fact]
     public void SnapshotBuffer_MultipleSnapshots_AllReturnValidWav()
     {
-        using var service = new AudioRecorderService();
+        using var service = CreateService();
         service.StartRecording();
 
         Thread.Sleep(200);
@@ -121,7 +176,7 @@ public class AudioRecorderServiceSnapshotTests
     [Fact]
     public void SnapshotBuffer_DoesNotAffectFinalRecording()
     {
-        using var service = new AudioRecorderService();
+        using var service = CreateService();
         service.StartRecording();
 
         Thread.Sleep(200);

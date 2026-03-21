@@ -4,22 +4,40 @@ namespace AISpeech.Services;
 
 public sealed class AudioRecorderService : IDisposable
 {
-    private WaveInEvent? _waveIn;
+    private IWaveIn? _waveIn;
     private WaveFileWriter? _waveWriter;
     private MemoryStream? _memoryStream;
     private readonly object _writeLock = new();
     private bool _disposed;
+    private readonly Func<IWaveIn>? _waveInFactory;
+
+    public AudioRecorderService() { }
+
+    /// <summary>
+    /// Constructor for dependency injection (e.g. testing without audio hardware).
+    /// </summary>
+    public AudioRecorderService(Func<IWaveIn> waveInFactory)
+    {
+        _waveInFactory = waveInFactory;
+    }
 
     public void StartRecording()
     {
         _memoryStream = new MemoryStream();
         var waveFormat = new WaveFormat(16000, 16, 1);
 
-        _waveIn = new WaveInEvent
+        if (_waveInFactory is not null)
         {
-            WaveFormat = waveFormat,
-            BufferMilliseconds = 50
-        };
+            _waveIn = _waveInFactory();
+        }
+        else
+        {
+            _waveIn = new WaveInEvent
+            {
+                WaveFormat = waveFormat,
+                BufferMilliseconds = 50
+            };
+        }
 
         _waveWriter = new WaveFileWriter(new NonClosingStream(_memoryStream), waveFormat);
 
