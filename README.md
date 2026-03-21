@@ -1,6 +1,6 @@
 # AISpeech
 
-A Windows system tray application that captures speech via a global hotkey, transcribes it locally using [Whisper.net](https://github.com/sandrohanea/whisper.net), and optionally refines the transcription using Azure OpenAI. The result is copied to your clipboard.
+A Windows system tray application that captures speech via a global hotkey, transcribes it locally using [Whisper.net](https://github.com/sandrohanea/whisper.net), and optionally refines the transcription using Azure OpenAI. The result is copied to your clipboard — and optionally pasted directly into the active window.
 
 ## How it works
 
@@ -9,7 +9,7 @@ A Windows system tray application that captures speech via a global hotkey, tran
 3. A **speech trigger phrase** at any point in your speech selects the processing mode
 4. If Azure OpenAI is configured, the transcription is refined based on the detected mode
 5. Audio cues play at each stage (configurable)
-6. The final text is copied to your clipboard
+6. The final text is copied to your clipboard (and pasted at the cursor if **Auto paste to cursor** is enabled)
 
 ## Speech trigger modes
 
@@ -55,6 +55,29 @@ Enable it in `appsettings.local.json`:
 ```
 
 **Note:** This runs an additional Whisper inference on each snapshot interval, which adds GPU load. It's disabled by default.
+
+## Auto paste to cursor
+
+When enabled, the transcribed text is automatically pasted into the window that was active when you released the hotkey — no manual Ctrl+V needed.
+
+How it works:
+
+1. When you release the hotkey, the app captures a reference to the currently focused window
+2. After transcription (and optional Azure OpenAI refinement) completes, the text is copied to the clipboard
+3. The captured window is brought back to the foreground
+4. A Ctrl+V keystroke is simulated to paste the text at the cursor position
+
+Toggle it at runtime via the tray icon right-click menu (**Auto paste to cursor** checkbox), or enable it in `appsettings.local.json`:
+
+```json
+{
+  "AISpeech": {
+    "AutoPasteAtCursor": true
+  }
+}
+```
+
+**Note:** This feature is disabled by default. Reprocessing via the tray menu always copies to clipboard only (no auto-paste).
 
 ## Prerequisites
 
@@ -117,6 +140,7 @@ All settings live in `appsettings.json` (defaults) and `appsettings.local.json` 
 | `SoundOnRecordStart` | `true` | Play a two-tone cue when recording starts |
 | `SoundOnRecordStop` | `true` | Play a two-tone cue when recording stops |
 | `SoundOnTranscriptionComplete` | `true` | Play a triple-pip cue when the result is ready |
+| `AutoPasteAtCursor` | `false` | Automatically paste transcribed text into the active window via simulated Ctrl+V |
 | `LivePreviewEnabled` | `false` | Show a floating overlay with interim transcription while recording |
 | `LivePreviewIntervalMs` | `2500` | How often (ms) to snapshot audio and run interim transcription |
 | `Language` | `en` | Transcription language |
