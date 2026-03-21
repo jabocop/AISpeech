@@ -16,6 +16,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private readonly PhraseTriggerService _phraseTrigger;
     private readonly TrayIconManager _iconManager;
     private readonly SoundService _sound;
+    private readonly TranscriptionOverlayForm _overlayForm;
     private readonly Form _marshalForm;
     private readonly Stopwatch _recordingStopwatch = new();
 
@@ -26,6 +27,8 @@ public sealed class TrayApplicationContext : ApplicationContext
     private ToolStripMenuItem? _autoPasteMenu;
     private bool _autoPasteToCursor;
     private IntPtr _targetWindow;
+    private CancellationTokenSource? _previewCts;
+    private int _interimRunning;
 
     private static readonly TimeSpan MinRecordingDuration = TimeSpan.FromMilliseconds(500);
 
@@ -55,6 +58,10 @@ public sealed class TrayApplicationContext : ApplicationContext
         _phraseTrigger = new PhraseTriggerService(settings);
         _clipboard = new ClipboardService(_marshalForm);
         _sound = new SoundService(settings);
+        _overlayForm = new TranscriptionOverlayForm();
+        // Force handle creation so BeginInvoke works before first Show
+        _overlayForm.Show();
+        _overlayForm.Hide();
         _autoPasteToCursor = settings.AutoPasteAtCursor;
         _hotkeyManager = new HotkeyManagerService(settings);
 
@@ -68,6 +75,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         Log($"Azure OpenAI cleanup: {(_textCleanup.IsConfigured ? "enabled" : "disabled (no config)")}");
         Log($"Auto-paste at cursor: {(settings.AutoPasteAtCursor ? "enabled" : "disabled")}");
         Log($"Sound effects: start={settings.SoundOnRecordStart}, stop={settings.SoundOnRecordStop}, done={settings.SoundOnTranscriptionComplete}");
+        Log($"Live preview: {(settings.LivePreviewEnabled ? $"enabled (interval {settings.LivePreviewIntervalMs}ms)" : "disabled")}");
 
         _ = InitializeAsync();
     }
@@ -112,6 +120,14 @@ public sealed class TrayApplicationContext : ApplicationContext
             _sound.PlayRecordStart();
             SetTrayState(RecordingState.Recording);
             Log("Recording started.");
+
+            if (_settings.LivePreviewEnabled)
+            {
+                _overlayForm.UpdateText("Listening...");
+                _overlayForm.ShowNear(Cursor.Position);
+                _previewCts = new CancellationTokenSource();
+                _ = RunLivePreviewLoopAsync(_previewCts.Token);
+            }
         }
         catch (Exception ex)
         {
@@ -132,9 +148,17 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
 
         _recordingStopwatch.Stop();
+        _previewCts?.Cancel();
         _sound.PlayRecordStop();
         _targetWindow = _autoPasteToCursor ? ClipboardService.CaptureTargetWindow() : IntPtr.Zero;
         Log($"Recording stopped. Duration: {_recordingStopwatch.Elapsed.TotalSeconds:F2}s");
+
+        if (_settings.LivePreviewEnabled)
+        {
+            _overlayForm.UpdateText("Transcribing...");
+            _overlayForm.ShowNear(Cursor.Position);
+        }
+
         _ = ProcessRecordingAsync();
     }
 
@@ -191,9 +215,68 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
         finally
         {
+            _overlayForm.HideOverlay();
             Interlocked.Exchange(ref _state, (int)RecordingState.Idle);
             SetTrayState(RecordingState.Idle);
             Log("State → Idle");
+        }
+    }
+
+    private async Task RunLivePreviewLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            Log("Live preview loop started.");
+
+            // Wait for initial audio to accumulate
+            await Task.Delay(_settings.LivePreviewIntervalMs, ct);
+
+            while (!ct.IsCancellationRequested)
+            {
+                // Skip if a previous interim transcription is still running
+                if (Interlocked.CompareExchange(ref _interimRunning, 1, 0) != 0)
+                {
+                    Log("Live preview: skipping, previous interim still running.");
+                    await Task.Delay(_settings.LivePreviewIntervalMs, ct);
+                    continue;
+                }
+
+                try
+                {
+                    using var snapshot = _recorder.SnapshotBuffer();
+                    if (snapshot is null)
+                    {
+                        Log("Live preview: snapshot returned null.");
+                    }
+                    else
+                    {
+                        Log($"Live preview: snapshot {snapshot.Length} bytes, transcribing...");
+                        // Don't pass ct — let in-flight transcription finish so we can show the result.
+                        // The loop stops starting new ones via the while condition.
+                        var text = await _transcriber.TranscribeInterimAsync(snapshot, CancellationToken.None);
+                        Log($"Live preview interim result: \"{text}\"");
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            _overlayForm.UpdateText(text);
+                            _overlayForm.ShowNear(Cursor.Position);
+                        }
+                    }
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _interimRunning, 0);
+                }
+
+                await Task.Delay(_settings.LivePreviewIntervalMs, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when recording stops — Task.Delay throws on cancel
+        }
+        catch (Exception ex)
+        {
+            Log($"Live preview error: {ex.Message}", DebugForm.LogLevel.Warn);
         }
     }
 
@@ -276,6 +359,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private void ExitApplication()
     {
         Log("Shutting down...");
+        _previewCts?.Cancel();
         _hotkeyManager.Stop();
         _trayIcon.Visible = false;
         _recorder.Dispose();
@@ -283,6 +367,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _textCleanup.Dispose();
         _hotkeyManager.Dispose();
         _sound.Dispose();
+        _overlayForm.Close();
         _debugForm.Close();
         Application.Exit();
     }
@@ -291,6 +376,8 @@ public sealed class TrayApplicationContext : ApplicationContext
     {
         if (disposing)
         {
+            _previewCts?.Cancel();
+            _previewCts?.Dispose();
             _trayIcon.Dispose();
             _iconManager.Dispose();
             _marshalForm.Dispose();
@@ -299,6 +386,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             _textCleanup.Dispose();
             _hotkeyManager.Dispose();
             _sound.Dispose();
+            _overlayForm.Dispose();
             _debugForm.Dispose();
         }
         base.Dispose(disposing);

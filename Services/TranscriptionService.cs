@@ -77,6 +77,24 @@ public sealed class TranscriptionService : IDisposable
         return string.Join(" ", segments).Trim();
     }
 
+    public async Task<string> TranscribeInterimAsync(MemoryStream wavStream, CancellationToken ct)
+    {
+        if (_factory is null)
+            throw new InvalidOperationException("TranscriptionService not initialized. Call InitializeAsync first.");
+
+        await using var processor = _factory.CreateBuilder()
+            .WithLanguage(_language)
+            .Build();
+
+        var segments = new List<string>();
+        await foreach (var segment in processor.ProcessAsync(wavStream).WithCancellation(ct))
+        {
+            segments.Add(segment.Text);
+        }
+
+        return string.Join(" ", segments).Trim();
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

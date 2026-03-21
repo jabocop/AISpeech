@@ -32,6 +32,30 @@ If the wrong mode was detected (e.g. you said "use plan" but Whisper didn't pick
 
 This sends the last raw transcription through Azure OpenAI with the selected mode and copies the new result to your clipboard. The option is disabled until the first transcription completes.
 
+## Live transcription preview
+
+When enabled, a floating overlay appears while recording to show a progressively updating preview of the transcription. This gives real-time visual feedback before the final transcription completes.
+
+The overlay:
+- Shows "Listening..." immediately when recording starts
+- Updates every ~2.5 seconds with an interim Whisper transcription of the audio so far
+- Shows "Transcribing..." briefly while the final transcription runs
+- Does not steal focus from your active window (uses `WS_EX_NOACTIVATE`)
+- Follows the cursor position, clamped to the screen
+
+Enable it in `appsettings.local.json`:
+
+```json
+{
+  "AISpeech": {
+    "LivePreviewEnabled": true,
+    "LivePreviewIntervalMs": 2500
+  }
+}
+```
+
+**Note:** This runs an additional Whisper inference on each snapshot interval, which adds GPU load. It's disabled by default.
+
 ## Prerequisites
 
 - Windows 10+ (targets `net10.0-windows10.0.17763.0`)
@@ -93,6 +117,8 @@ All settings live in `appsettings.json` (defaults) and `appsettings.local.json` 
 | `SoundOnRecordStart` | `true` | Play a two-tone cue when recording starts |
 | `SoundOnRecordStop` | `true` | Play a two-tone cue when recording stops |
 | `SoundOnTranscriptionComplete` | `true` | Play a triple-pip cue when the result is ready |
+| `LivePreviewEnabled` | `false` | Show a floating overlay with interim transcription while recording |
+| `LivePreviewIntervalMs` | `2500` | How often (ms) to snapshot audio and run interim transcription |
 | `Language` | `en` | Transcription language |
 
 The Whisper model is downloaded automatically on first run if not present.
@@ -145,8 +171,9 @@ Tests cover:
 - **PhraseTriggerService** — Trigger matching, phrase removal, case insensitivity, mode detection, edge cases
 - **HotkeyManagerService** — Modifier parsing, validation, case insensitivity, error handling
 - **TextCleanupService** — Request formatting, API key headers, mode-specific system prompts, error handling, response parsing (all HTTP calls are mocked — no real requests to Azure OpenAI)
-- **AppSettings** — Sound settings defaults and configuration binding
+- **AppSettings** — Sound settings defaults, live preview settings defaults, configuration binding
 - **SoundService** — Disabled-sound no-ops, disposal safety
+- **AudioRecorderService (Snapshot)** — Buffer snapshots produce valid WAV, null when not recording, multiple snapshots, no interference with final recording
 
 ## CI
 
@@ -165,6 +192,7 @@ AISpeech/
 ├── TrayApplicationContext.cs     Main app lifecycle, coordinates services
 ├── TrayIconManager.cs            Dynamic tray icon generation
 ├── DebugForm.cs                  Debug log window
+├── TranscriptionOverlayForm.cs  Live preview floating overlay
 ├── appsettings.json              Default configuration
 ├── appsettings.local.json        Local secrets (git-ignored)
 ├── Services/

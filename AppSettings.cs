@@ -33,4 +33,7 @@ public sealed class AppSettings
     public bool SoundOnRecordStart { get; set; } = true;
     public bool SoundOnRecordStop { get; set; } = true;
     public bool SoundOnTranscriptionComplete { get; set; } = true;
+
+    public bool LivePreviewEnabled { get; set; } = false;
+    public int LivePreviewIntervalMs { get; set; } = 2500;
 }
